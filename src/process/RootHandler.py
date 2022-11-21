@@ -1,62 +1,97 @@
 import uproot
-from typing import List, Optional
+from typing import List, Optional, Union
 import pandas as pd
 import gc
+import os
+from pathlib2 import Path
+import logging
+from warnings import simplefilter
+import sys
+
+log = logging.getLogger(__name__)
 
 
 class RootHandler:
-    """Class responsible for all root manipulation, especially
-    data conversion from root to DataFrame type."""
+    """Class responsible for all root manipulation, especially data conversion from root to
+    DataFrame type, including conversion from multi-column, fixed root data representation
+    to modern DataFrame one"""
 
-    def root_to_dataframe(
+    @staticmethod
+    def extract_root(
         root_paths: List[str],
-    ):
-        """root_to_dataframe Method converting dataset from root to DataFrame.
-
+        branches_to_extract: List[str],
+        chunk_size: str,
+        min_hits_no: int,
+        max_hits_no: int,
+        events_limit_no: Union[int, None],
+        interim_dir: str,
+    ) -> None:
+        """extract_root Method that extracts root to DataFrame format, applies all functions that
+        convert multi-column, fixed data representation into modern DataFrame style.
+        Calculates standard deviation of hits' coordinates (spread), merges both station sides
+        data, merges hits coming from 4 planes from single detector into average one (weighted
+        average by charge).
+        Extracted and processed data will be saved in '{interim_dir}/extracted_root.parquet' file.
 
         Args:
-            root_paths (_type_): _description_
+            root_paths (List[str]): List containing paths to root files that will be extracted.
+            branches_to_extract (List[str]): List of branches that will be extracted from root
+            TTree
+            chunk_size (str): Size of single root chunk that will be processed at the time.
+            min_hits_no (int): Minimal number of hits in single event. Any events with lower
+            number of hits will be removed.
+            max_hits_no (int): Maximum number of hits in single event. Any events with higher
+            number of hits will be removed.
+            events_limit_no (Union[int, None]): Limit number of events that will be extracted.
+            If None, all events in file will be taken.
+            interim_dir (str): Path to interim directory, where new folder "extracted_root"
+            with function output will be created.
         """
-        preprocess_functions = []
+        output_dir = Path(interim_dir) / "extracted_root"
+        output_dir.mkdir(parents=True, exist_ok=True)
 
-        for single_root_name in root_files:
-            root_path = str(
-                os.path.join(
-                    parameters.path_to_root_dict, single_root_name + ".root"
-                )
-            )
+        simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
+        sys.path.append(".")
 
+        for root_path in root_paths:
             with uproot.open(root_path) as file:
                 total_size = float(os.path.getsize(root_path)) * 1e-9
-                tree = file["TreeHits"]
-
                 chunk_iter = 0
 
+                tree = file["TreeHits"]
+
                 for chunk in tree.iterate(
-                    preprocess_branches, library="pd", step_size=chunk_size
+                    branches_to_extract,
+                    library="pd",
+                    step_size=chunk_size,
+                    entry_stop=events_limit_no,
                 ):
-                    chunk_iter += 1
-                    file_name = single_root_name + str(chunk_iter)
-
-                    chunk = Preprocessing.preprocess_single_dataframe(
-                        chunk, preprocess_functions, single_root_name
+                    chunk = RootHandler._extract_hits_number(chunk)
+                    chunk = RootHandler._extract_average_coordinates(chunk)
+                    chunk = RootHandler._extract_hit_std_deviation(chunk)
+                    chunk = RootHandler._merge_sides(
+                        chunk, min_hits_no, max_hits_no
                     )
+                    chunk = RootHandler._merge_hit_std_deviations(chunk)
 
-                    Preprocessing.save_preprocessed_dataframe(
-                        chunk, file_name=file_name
+                    output_path = (
+                        output_dir
+                        / f"{Path(root_path).stem}_{chunk_iter}.parquet"
                     )
+                    chunk.to_parquet(output_path, engine="pyarrow")
 
                     size_done = int(chunk_size[:-3]) * chunk_iter * 1e-3
-
-                    print(
-                        f"preprocessing: {single_root_name} | progress: {size_done:.2f}/{total_size:.2f} GB"
+                    log.info(
+                        f"- preprocessing: {Path(root_path).stem} | progress: {size_done:.2f}/{total_size:.2f} GB"
                     )
-                    print(chunk)
-                    print("@@ MEMORY USAGE @@", chunk.memory_usage(deep=True))
-                    print(chunk.info())
-        print("Preprocess finished!")
+                    log.debug(chunk.info(), chunk.memory_usage(deep=True))
 
-    def extract_hits_number(df: pd.DataFrame) -> pd.DataFrame:
+                    chunk_iter += 1
+
+        log.info("Preprocess finished!")
+
+    @staticmethod
+    def _extract_hits_number(df: pd.DataFrame) -> pd.DataFrame:
         """extract_hits_number Reduces redundant, multiple columns containing information about
         hit numbers into two single columns, each for stations side.
 
@@ -75,7 +110,8 @@ class RootHandler:
         df.drop(df.filter(regex="^hits\\[", axis=1), axis=1, inplace=True)
         return df
 
-    def extract_average_coordinates(df: pd.DataFrame) -> pd.DataFrame:
+    @staticmethod
+    def _extract_average_coordinates(df: pd.DataFrame) -> pd.DataFrame:
         """extract_average_coordinates Reduces multiple columns containing information about
         hit column and hit row of multiple hits in single event into two columns containing
         information about weighted average column and average row for all hits. Average is
@@ -160,7 +196,8 @@ class RootHandler:
 
         return df
 
-    def extract_hit_std_deviation(df: pd.DataFrame) -> pd.DataFrame:
+    @staticmethod
+    def _extract_hit_std_deviation(df: pd.DataFrame) -> pd.DataFrame:
         """extract_hit_std_deviation Calculated and adds columns to dataframe containing i
         nformation about standard deviation of hit column, row for each station side.
 
@@ -193,7 +230,8 @@ class RootHandler:
 
         return df
 
-    def merge_sides(
+    @staticmethod
+    def _merge_sides(
         df: pd.DataFrame,
         min_hits: Optional[int] = 1,
         max_hits: Optional[int] = 100,
@@ -255,7 +293,8 @@ class RootHandler:
 
         return df
 
-    def merge_hit_std_deviations(df: pd.DataFrame) -> pd.DataFrame:
+    @staticmethod
+    def _merge_hit_std_deviations(df: pd.DataFrame) -> pd.DataFrame:
         """merge_std_deviations Replaces standard deviation for column and row with standard
         deviation distance, calculated with simple Pythagoras formula.
 

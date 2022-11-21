@@ -24,6 +24,7 @@ awkward = "^1.10.2"
 pathlib2 = "^2.3.7"
 dask = {extras = ["complete"], version = "^2022.11.0"}
 Cython = "^0.29.32"
+pyarrow = "^10.0.0"
 
 
 [tool.poetry.dev-dependencies]

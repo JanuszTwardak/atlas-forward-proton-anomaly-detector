@@ -7,8 +7,7 @@ use_functions:
   - merge_std_deviations
   - optimize_memory
 
-use_branches:
-
+branches_to_extract:
   - evN # (int) event number, value unique for each run
   - hits  # (int) total number of hits registered in single event
   - hits_row  # (int) between [0, 335], coordinate row number
@@ -20,7 +19,9 @@ use_branches:
   - tracks_sx
   - tracks_sy
 
-
+min_hits_number: 1
+max_hits_number: 100
+events_limit_no: 100
 #################### PERFORMANCE ####################
 
 memory_chunk_size: 50 MB

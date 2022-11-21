@@ -1986,6 +1986,17 @@ optional = false
 python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*"
 
 [[package]]
+name = "pyarrow"
+version = "10.0.0"
+description = "Python library for Apache Arrow"
+category = "main"
+optional = false
+python-versions = ">=3.7"
+
+[package.dependencies]
+numpy = ">=1.16.6"
+
+[[package]]
 name = "pycparser"
 version = "2.21"
 description = "C parser in Python"
@@ -2684,7 +2695,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "flake8 
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "5f8432fd91a1e84cdf634000154fc39ac8c59c21b44f928bca7d7d92f5af7573"
+content-hash = "5a1219fe5f9c01e0329d1d2fea368107eae8e8c61231f130c051815050040d08"
 
 [metadata.files]
 aiohttp = []
@@ -2827,6 +2838,7 @@ psutil = []
 ptyprocess = []
 pure-eval = []
 py = []
+pyarrow = []
 pycparser = []
 pydot = []
 pygit2 = []
