@@ -1,3 +1,26 @@
-use_columns: 
-  - col1
-  - col2
+#################### ROOT DATA ####################
+use_functions:
+  - add_hits_number
+  - add_average_coordinates
+  - add_hit_std_deviation
+  - merge_detector_sides
+  - merge_std_deviations
+  - optimize_memory
+
+use_branches:
+
+  - evN # (int) event number, value unique for each run
+  - hits  # (int) total number of hits registered in single event
+  - hits_row  # (int) between [0, 335], coordinate row number
+  - hits_col  # (int) between [0, 79], coordinate column number
+  - hits_q  # () charge left in single hit
+  - tracks 
+  - tracks_x
+  - tracks_y
+  - tracks_sx
+  - tracks_sy
+
+
+#################### PERFORMANCE ####################
+
+memory_chunk_size: 50 MB

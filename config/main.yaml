@@ -16,7 +16,8 @@ external:
   path: ${external.dir}/${external.name}
 
 raw: 
-  path: data/raw/sample.csv
+  paths:
+    - data/raw/427929.root
 
 interim:
   dir: data/interim
