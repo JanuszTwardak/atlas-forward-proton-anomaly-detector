@@ -1,0 +1,32 @@
+defaults:
+  - process: process1
+  - model: model1
+  - _self_
+
+
+reports:
+  dir: reports
+  figures_dir: reports/figures
+
+
+################################ DATA ################################
+external:
+  dir: data/external
+  name: external.csv
+  path: ${external.dir}/${external.name}
+
+raw: 
+  path: data/raw/sample.csv
+
+interim:
+  dir: data/interim
+  name: interim.csv
+  path: ${interim.dir}/${interim.name}
+
+processed:
+  dir: data/processed
+  name: processed.csv
+  path: ${processed.dir}/${processed.name}
+
+
+######################################################################

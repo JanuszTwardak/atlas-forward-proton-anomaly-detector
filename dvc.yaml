@@ -1,0 +1,34 @@
+stages:
+  process_data:
+    cmd: python src/process.py
+    deps:
+    - src/process
+    - config/main.yaml
+    - config/process
+    - data/raw
+    - src/process.py
+    outs:
+    - data/processed:
+        persist: true
+  train_model:
+    cmd: python src/train_model.py
+    deps:
+    - src/model
+    - config/main.yaml
+    - config/model
+    - data/processed
+    - src/train_model.py
+    outs:
+    - models:
+        persist: true
+  visualize:
+    cmd: python src/visualize.py
+    deps:
+    - src/visualize
+    - config/main.yaml
+    - data/processed
+    - config/model
+    - src/visualize.py
+    outs:
+    - reports:
+        persist: true

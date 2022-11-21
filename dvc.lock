@@ -1,0 +1,80 @@
+schema: '2.0'
+stages:
+  process_data:
+    cmd: python src/process.py
+    deps:
+    - path: config/main.yaml
+      md5: 3e2ea25128beddbe1bb0adaa7d8b5ab1
+      size: 579
+    - path: config/process
+      md5: df97c8e2e624cc5a37f170af7c162dc9.dir
+      size: 71
+      nfiles: 2
+    - path: data/raw
+      md5: 6ffbaaad7b4ac6e1afabed19a80b2560.dir
+      size: 0
+      nfiles: 1
+    - path: src/process
+      md5: 6ffbaaad7b4ac6e1afabed19a80b2560.dir
+      size: 0
+      nfiles: 1
+    - path: src/process.py
+      md5: c62061bf646fa00b3fafb62095c7d03b
+      size: 422
+    outs:
+    - path: data/processed
+      md5: 6ffbaaad7b4ac6e1afabed19a80b2560.dir
+      size: 0
+      nfiles: 1
+  visualize:
+    cmd: python src/visualize.py
+    deps:
+    - path: config/main.yaml
+      md5: 3e2ea25128beddbe1bb0adaa7d8b5ab1
+      size: 579
+    - path: config/model
+      md5: 2b8a65a0449618b79724d144c45809bc.dir
+      size: 24
+      nfiles: 2
+    - path: data/processed
+      md5: 6ffbaaad7b4ac6e1afabed19a80b2560.dir
+      size: 0
+      nfiles: 1
+    - path: src/visualize
+      md5: 6ffbaaad7b4ac6e1afabed19a80b2560.dir
+      size: 0
+      nfiles: 1
+    - path: src/visualize.py
+      md5: 357bbcb7d5916a81c4ae742537ad9cea
+      size: 547
+    outs:
+    - path: reports
+      md5: 406ce63d8f7db4ee78058d1b102cca6b.dir
+      size: 0
+      nfiles: 2
+  train_model:
+    cmd: python src/train_model.py
+    deps:
+    - path: config/main.yaml
+      md5: 3e2ea25128beddbe1bb0adaa7d8b5ab1
+      size: 579
+    - path: config/model
+      md5: 2b8a65a0449618b79724d144c45809bc.dir
+      size: 24
+      nfiles: 2
+    - path: data/processed
+      md5: 6ffbaaad7b4ac6e1afabed19a80b2560.dir
+      size: 0
+      nfiles: 1
+    - path: src/model
+      md5: 6ffbaaad7b4ac6e1afabed19a80b2560.dir
+      size: 0
+      nfiles: 1
+    - path: src/train_model.py
+      md5: bf26202037fa4548d54c8b1628fdb4d5
+      size: 533
+    outs:
+    - path: models
+      md5: 6ffbaaad7b4ac6e1afabed19a80b2560.dir
+      size: 0
+      nfiles: 1
