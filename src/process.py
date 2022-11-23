@@ -1,14 +1,32 @@
 import hydra
 from omegaconf import DictConfig
 from hydra.utils import to_absolute_path as abspath
+import logging
+from process.RootHandler import RootHandler
 
-@hydra.main(config_path="../config", config_name='main')
-def process_data(config: DictConfig):
+log = logging.getLogger("process")
+
+
+@hydra.main(
+    version_base=None,
+    config_path="../config",
+    config_name="main",
+)
+def process_data(cfg: DictConfig):
     """Function to process the data"""
 
-    raw_path = abspath(config.raw.path)
-    print(f"Process data using {raw_path}")
-    print(f"Columns used: {config.process.use_columns}")
+    print(f"Functions used: {cfg.process.use_functions}")
 
-if __name__ == '__main__':
+    RootHandler.extract_root(
+        root_paths=[abspath(path) for path in cfg.raw.paths],
+        branches_to_extract=cfg.process.branches_to_extract,
+        chunk_size=cfg.process.memory_chunk_size,
+        min_hits_no=cfg.process.min_hits_number,
+        max_hits_no=cfg.process.max_hits_number,
+        events_limit_no=cfg.process.events_limit_no,
+        interim_dir=abspath(cfg.interim.dir),
+    )
+
+
+if __name__ == "__main__":
     process_data()

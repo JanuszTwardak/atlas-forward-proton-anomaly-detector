@@ -1,3 +1,5 @@
+from collections import OrderedDict
+import numpy as np
 import uproot
 from typing import List, Optional, Union
 import pandas as pd
@@ -8,7 +10,7 @@ import logging
 from warnings import simplefilter
 import sys
 
-log = logging.getLogger(__name__)
+log = logging.getLogger("process")
 
 
 class RootHandler:
@@ -47,9 +49,12 @@ class RootHandler:
             interim_dir (str): Path to interim directory, where new folder "extracted_root"
             with function output will be created.
         """
+
         output_dir = Path(interim_dir) / "extracted_root"
         output_dir.mkdir(parents=True, exist_ok=True)
 
+        # uproot hasn't been updated for some time and because of that it uses deprecated
+        # function from Pandas to merge DataFrames, which creates hundreds of
         simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
         sys.path.append(".")
 
@@ -67,12 +72,16 @@ class RootHandler:
                     entry_stop=events_limit_no,
                 ):
                     chunk = RootHandler._extract_hits_number(chunk)
-                    chunk = RootHandler._extract_average_coordinates(chunk)
+                    chunk = RootHandler._extract_avg_coords_and_charge(chunk)
                     chunk = RootHandler._extract_hit_std_deviation(chunk)
+                    chunk = RootHandler._extract_tracks(chunk)
                     chunk = RootHandler._merge_sides(
                         chunk, min_hits_no, max_hits_no
                     )
                     chunk = RootHandler._merge_hit_std_deviations(chunk)
+
+                    chunk["run_id"] = str(Path(root_path).stem)
+                    chunk["run_id"] = chunk["run_id"].astype("category")
 
                     output_path = (
                         output_dir
@@ -111,7 +120,7 @@ class RootHandler:
         return df
 
     @staticmethod
-    def _extract_average_coordinates(df: pd.DataFrame) -> pd.DataFrame:
+    def _extract_avg_coords_and_charge(df: pd.DataFrame) -> pd.DataFrame:
         """extract_average_coordinates Reduces multiple columns containing information about
         hit column and hit row of multiple hits in single event into two columns containing
         information about weighted average column and average row for all hits. Average is
@@ -130,7 +139,6 @@ class RootHandler:
             from one side, not order of station placement.
         """
 
-        # first detector (in hit order, which means for side A we take detector #2 -> detector #1 data)
         weights_a_1 = df.filter(regex="^hits_q\\[1", axis=1).where(
             df.filter(regex="^hits_q\[", axis=1) != -1000001.0, 0
         )
@@ -191,6 +199,12 @@ class RootHandler:
         ) / weights_c_2.sum(axis=1)
 
         del [columns_a, columns_c]
+
+        df["a_charge_1"] = weights_a_1.sum(axis=1)
+        df["a_charge_2"] = weights_a_2.sum(axis=1)
+        df["c_charge_1"] = weights_c_1.sum(axis=1)
+        df["c_charge_2"] = weights_c_2.sum(axis=1)
+
         del [weights_a_1, weights_c_1, weights_a_2, weights_c_2]
         gc.collect()
 
@@ -255,35 +269,19 @@ class RootHandler:
             names: "hits_n", "hit_row_1",, "hit_row_2", "hit_column_1", "hit_column_2",
             "_std_col", "_std_row".
         """
+        _deprecated_names = [
+            name for name in df.columns if name[0:2] in ["a_", "c_"]
+        ]
+        _new_names = [name[2:] for name in _deprecated_names]
+
+        name_changes = dict(zip(_deprecated_names, _new_names))
 
         buffor = df.drop(df.filter(regex="^c", axis=1), axis=1)
-        buffor.rename(
-            columns={
-                "a_hits_n": "hits_n",
-                "a_hit_row_1": "hit_row_1",
-                "a_hit_row_2": "hit_row_2",
-                "a_hit_column_1": "hit_column_1",
-                "a_hit_column_2": "hit_column_2",
-                "a_std_col": "_std_col",
-                "a_std_row": "_std_row",
-            },
-            inplace=True,
-        )
+        buffor = buffor.rename(columns=name_changes)
         buffor["side"] = "a"
 
         df = df.drop(df.filter(regex="^a", axis=1), axis=1)
-        df.rename(
-            columns={
-                "c_hits_n": "hits_n",
-                "c_hit_row_1": "hit_row_1",
-                "c_hit_row_2": "hit_row_2",
-                "c_hit_column_1": "hit_column_1",
-                "c_hit_column_2": "hit_column_2",
-                "c_std_col": "_std_col",
-                "c_std_row": "_std_row",
-            },
-            inplace=True,
-        )
+        df = df.rename(columns=name_changes)
         df["side"] = "c"
         df = df.append(buffor)
         df["side"] = df["side"].astype("category")
@@ -307,11 +305,79 @@ class RootHandler:
         """
 
         df["std_distance"] = (
-            df["_std_col"] * df["_std_col"].values
-            + df["_std_row"].values * df["_std_row"].values
+            df["std_col"] * df["std_col"].values
+            + df["std_row"].values * df["std_row"].values
         )
         df["std_distance"] = df["std_distance"].pow(1 / 2)
 
         df.drop(df.filter(regex="^_", axis=1), axis=1, inplace=True)
+
+        return df
+
+    @staticmethod
+    def _peek_at_root(
+        root_paths: List[str],
+    ):
+
+        simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
+        sys.path.append(".")
+
+        for root_path in root_paths:
+            with uproot.open(root_path) as file:
+                log.info(file.keys())
+                log.info(file["TreeHits"].show())
+
+    @staticmethod
+    def _extract_tracks(df: pd.DataFrame) -> pd.DataFrame:
+        """extract_hits_number Reduces redundant, multiple columns containing information about
+        tracks into 18 single columns, each for stations side.
+
+        Args:
+            df (pd.DataFrame): Dataframe converted from root containing all columns with
+            information about tracks.
+
+        Returns:
+            pd.DataFrame: Dataframe without redundant columns. They are replaced with 18 columns
+            containing total number of hits in single event for
+            anti-clockwise and clockwise station sides, respectively.
+        """
+
+        ## tracks
+        df["a_tracks"] = df.filter(regex="^tracks\\[[01]", axis=1).sum(axis=1)
+        df["c_tracks"] = df.filter(regex="^tracks\\[[23]", axis=1).sum(axis=1)
+        df.drop(df.filter(regex="^tracks\\[", axis=1), axis=1, inplace=True)
+
+        # CERN uses fixed memory slots to hold multiple particles, by default initializes them
+        # with -1000001 or 1000000 and it stays with this value if slot is not used for storing
+        # info, i.e. number of registered particles was smaller than number of slots
+        df = df.replace(-1000001, np.nan)
+        df = df.replace(1000000, np.nan)
+
+        # Might look tricky, but very easy to understand. We have few different features named
+        # "tracks_{A}", where A is element from suffixes and that is the first loop.
+        suffixes = ("x", "y", "sx", "sy")
+
+        # Inside loop iterates through four detectors, where first two belong to "a" side and
+        # latter two to "c" side. The only tricky part is that we want to take order in which
+        # particle has gone through detectors, which is 1->0 for a side and 2->3 for c side:
+        # <----- [0] <----- [1] <-----(HIT)-----> [2] -----> [3] ----->
+        num_to_side = OrderedDict([(1, "a"), (0, "a"), (2, "c"), (3, "c")])
+
+        # at the end of new column name we add "_1" or "_2" to represent order in which
+        # track was registered
+        side_num_corr = {1: 1, 0: 2, 2: 1, 3: 2}
+
+        for suff in suffixes:
+            for num, side in num_to_side.items():
+
+                col_name = f"{side}_tracks_{suff}_{side_num_corr[num]}"
+
+                df[col_name] = (
+                    df.filter(regex=f"^tracks_{suff}\\[{num}", axis=1)
+                ).mean(axis=1)
+
+                df = df.drop(
+                    df.filter(regex=f"^tracks_{suff}\\[{num}", axis=1), axis=1
+                )
 
         return df

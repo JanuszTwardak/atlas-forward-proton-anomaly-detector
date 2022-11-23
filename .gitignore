@@ -94,3 +94,5 @@ target/
 outputs
 /reports
 /models
+data/interim/extracted_root/
+test.csv
