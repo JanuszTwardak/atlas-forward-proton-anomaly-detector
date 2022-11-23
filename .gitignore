@@ -96,3 +96,4 @@ outputs
 /models
 data/interim/extracted_root/
 test.csv
+data/processed/

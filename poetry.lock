@@ -1751,6 +1751,14 @@ antlr4-python3-runtime = ">=4.9.0,<4.10.0"
 PyYAML = ">=5.1.0"
 
 [[package]]
+name = "p5py"
+version = "1.0.0"
+description = "p5py is project for converting cobra-processing into p5js"
+category = "main"
+optional = false
+python-versions = "*"
+
+[[package]]
 name = "packaging"
 version = "21.3"
 description = "Core utilities for Python packages"
@@ -1845,6 +1853,17 @@ python-versions = ">= 3.6"
 [package.dependencies]
 mako = "*"
 markdown = ">=3.0"
+
+[[package]]
+name = "pep517"
+version = "0.13.0"
+description = "Wrappers to build Python packages using PEP 517 hooks"
+category = "main"
+optional = false
+python-versions = ">=3.6"
+
+[package.dependencies]
+tomli = {version = ">=1.1.0", markers = "python_version < \"3.11\""}
 
 [[package]]
 name = "pexpect"
@@ -2695,7 +2714,7 @@ testing = ["pytest (>=6)", "pytest-checkdocs (>=2.4)", "pytest-flake8", "flake8 
 [metadata]
 lock-version = "1.1"
 python-versions = "^3.8"
-content-hash = "5a1219fe5f9c01e0329d1d2fea368107eae8e8c61231f130c051815050040d08"
+content-hash = "fded238a1b13bc2569b9cf15ec4b5cac8bdf41b2acebe756f30ea9bb2ddbcc30"
 
 [metadata.files]
 aiohttp = []
@@ -2817,6 +2836,7 @@ notebook = []
 notebook-shim = []
 numpy = []
 omegaconf = []
+p5py = []
 packaging = []
 pandas = []
 pandocfilters = []
@@ -2825,6 +2845,7 @@ partd = []
 pathlib2 = []
 pathspec = []
 pdoc3 = []
+pep517 = []
 pexpect = []
 pickleshare = []
 pillow = []

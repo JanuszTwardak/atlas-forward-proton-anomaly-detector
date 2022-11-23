@@ -9,7 +9,7 @@ reports:
   figures_dir: reports/figures
 
 
-################################ DATA ################################
+################################ PATHS ################################
 external:
   dir: data/external
   name: external.csv
@@ -29,5 +29,8 @@ processed:
   name: processed.csv
   path: ${processed.dir}/${processed.name}
 
+################################
+
+model_dir: models
 
 ######################################################################

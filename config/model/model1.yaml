@@ -1,1 +1,9 @@
 name: model1
+
+model_nametag: null
+
+#################### MODEL PARAMETERS ####################
+forest_dimensions: 1
+ntrees: 200
+
+columns_to_drop: ["evN", "run_number"]

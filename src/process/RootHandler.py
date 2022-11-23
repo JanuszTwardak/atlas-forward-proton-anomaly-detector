@@ -26,14 +26,14 @@ class RootHandler:
         min_hits_no: int,
         max_hits_no: int,
         events_limit_no: Union[int, None],
-        interim_dir: str,
+        output_dir: str,
     ) -> None:
         """extract_root Method that extracts root to DataFrame format, applies all functions that
         convert multi-column, fixed data representation into modern DataFrame style.
         Calculates standard deviation of hits' coordinates (spread), merges both station sides
         data, merges hits coming from 4 planes from single detector into average one (weighted
         average by charge).
-        Extracted and processed data will be saved in '{interim_dir}/extracted_root.parquet' file.
+        Extracted and processed data will be saved in '{output_dir}/extracted_root.parquet' file.
 
         Args:
             root_paths (List[str]): List containing paths to root files that will be extracted.
@@ -46,11 +46,11 @@ class RootHandler:
             number of hits will be removed.
             events_limit_no (Union[int, None]): Limit number of events that will be extracted.
             If None, all events in file will be taken.
-            interim_dir (str): Path to interim directory, where new folder "extracted_root"
+            output_dir (str): Path to save directory where new folder "extracted_root"
             with function output will be created.
         """
 
-        output_dir = Path(interim_dir) / "extracted_root"
+        output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # uproot hasn't been updated for some time and because of that it uses deprecated
