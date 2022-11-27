@@ -1,0 +1,24 @@
+plots:
+  pairplot:
+    to_draw: False
+    kind: "histplot"
+    # (float in [0, 1] | None) cells with aggregate counts (statistics) 
+    # up to this proportion of the total will be transparent.
+    p_threshold: 0.15
+    bins: 100
+    use_common_norm: False
+
+  boxplot:
+    to_draw: False
+
+  quartile_boxplot:
+    to_draw: True
+  
+flierprops: 
+  markersize: 1
+  linestyle: none
+  alpha: 0.002
+
+cmap: "flare"
+
+taken_dataset_frac: 1.0

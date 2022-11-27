@@ -97,3 +97,4 @@ outputs
 data/interim/extracted_root/
 test.csv
 data/processed/
+data/external/

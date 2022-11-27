@@ -1,36 +1,56 @@
 defaults:
-  - process: process1
-  - model: model1
+  - process: process_main       
+  - model: model_main
+  - visualize: visualize_main
   - _self_
 
-
-reports:
-  dir: reports
-  figures_dir: reports/figures
+###
+#PIPELINE
+to_train: True
+to_merge_scores_and_data: True
+draw_all_plots: False
 
 
 ################################ PATHS ################################
-external:
-  dir: data/external
-  name: external.csv
-  path: ${external.dir}/${external.name}
-
+# raw .root files with all data, this folder is treated as if it was "to read only",
+# so no changes should be done on original files
 raw: 
+  dir: data/raw
   paths:
     - data/raw/427929.root
 
+# data already processed somehow, but still not ready for training
 interim:
   dir: data/interim
   name: interim.csv
   path: ${interim.dir}/${interim.name}
 
+# data after all preprocessing, ready to be used to train the model
 processed:
   dir: data/processed
   name: processed.csv
   path: ${processed.dir}/${processed.name}
 
-################################
+# any other data coming from external sources or not being extracted from data/raw folder
+external:
+  dir: data/external
+  name: external.csv
+  path: ${external.dir}/${external.name}
 
+# directory used to store trained models
 model_dir: models
 
+# directory used for holding reports and results coming from analyzing trained model as
+# well as all plots
+reports:
+  dir: reports
+  figures_dir: reports/figures
+
+
+
+reports_dir: reports
+figures_dir: reports/figures
+
 ######################################################################
+
+      
