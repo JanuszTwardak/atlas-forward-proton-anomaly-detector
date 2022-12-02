@@ -1,0 +1,14 @@
+model_nametag: 1_iForest
+
+use_tracks: False
+columns_to_drop: ["evN", "run_number"]
+
+#################### MODEL PARAMETERS ####################
+forest_dimensions: 1
+sample_size: 256
+max_depth: 8
+ntrees: 100
+missing_action: fail
+
+
+

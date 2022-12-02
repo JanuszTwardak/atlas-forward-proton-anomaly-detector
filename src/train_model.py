@@ -1,5 +1,6 @@
 import pickle
 import hydra
+from matplotlib import pyplot as plt
 from omegaconf import DictConfig
 from hydra.utils import to_absolute_path as abspath
 from isotree import IsolationForest
@@ -20,8 +21,6 @@ log = logging.getLogger("__name__")
 def train_model(cfg: DictConfig) -> None:
     """Function to train the model on all data from processed dir. It should have .parquet format."""
 
-    print(f"Functions used: {cfg.model.name}")
-
     # input_path = abspath(config.processed.path)
     # output_path = abspath(config.final.path)
 
@@ -35,6 +34,13 @@ def train_model(cfg: DictConfig) -> None:
             input_data_dir=abspath(cfg.processed.dir),
             model_dir=abspath(cfg.model_dir),
             use_tracks=cfg.model.use_tracks,
+            max_depth=cfg.model.max_depth,
+            missing_action=cfg.model.missing_action,
+            sample_size=cfg.model.sample_size,
+            prob_pick_pooled_gain=cfg.model.prob_pick_pooled_gain,
+            ntry=cfg.model.ntry,
+            prob_pick_avg_gain=cfg.model.prob_pick_avg_gain,
+            coefs=cfg.model.coefs,
         )
 
     _predict_scores(
@@ -51,11 +57,20 @@ def _train_or_load(
     input_data_dir: str,
     model_dir: str,
     use_tracks: bool,
+    sample_size: int,
+    max_depth: int,
+    missing_action: str,
+    prob_pick_pooled_gain: float,
+    ntry: int,
+    prob_pick_avg_gain: float,
+    coefs: str,
 ) -> None:
 
     model = IsolationForest(
+        sample_size=sample_size,
         ndim=forest_dimensions,
         ntrees=ntrees,
+        missing_action=missing_action,
     )
 
     dataset_path_list = [
@@ -131,7 +146,7 @@ def _predict_scores(
             model.predict(_pred_chunk),
         )
 
-        scores.to_csv(scores_save_path, mode="a", index=False, header=True)
+        scores.to_csv(scores_save_path, mode="a", index=False, header=False)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 plots:
   pairplot:
-    to_draw: False
+    to_draw: True
     kind: "histplot"
     # (float in [0, 1] | None) cells with aggregate counts (statistics) 
     # up to this proportion of the total will be transparent.
@@ -12,13 +12,13 @@ plots:
     to_draw: False
 
   quartile_boxplot:
-    to_draw: True
+    to_draw: False
   
 flierprops: 
   markersize: 1
   linestyle: none
   alpha: 0.002
 
-cmap: "flare"
+cmap: flare
 
 taken_dataset_frac: 1.0

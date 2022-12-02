@@ -1,0 +1,33 @@
+model_nametag: 3_sciforest
+
+use_tracks: False
+columns_to_drop: ["evN", "run_number"]
+
+#################### MODEL PARAMETERS ####################
+forest_dimensions: 2
+sample_size: null
+max_depth: 20
+ntrees: 92
+missing_action: impute
+coefs: uniform
+prob_pick_pooled_gain: 1.0
+prob_pick_avg_gain: 1.0
+min_gain: 0.2
+penalize_range: False
+ntry: 10
+
+
+#SOTA
+# model:
+#   model_nametag: 3_sciforest
+#   use_tracks: false
+#   columns_to_drop:
+#   - evN
+#   - run_number
+#   forest_dimensions: 3
+#   sample_size: null
+#   max_depth: 50
+#   ntrees: 1000
+#   missing_action: fail
+#   prob_pick_pooled_gain: 1.0
+#   ntry: 30

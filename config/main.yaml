@@ -1,13 +1,13 @@
 defaults:
   - process: process_main       
-  - model: model_main
+  - model: model_2
   - visualize: visualize_main
   - _self_
 
 ###
 #PIPELINE
 to_train: True
-to_merge_scores_and_data: True
+to_merge_scores_and_data: False
 draw_all_plots: False
 
 

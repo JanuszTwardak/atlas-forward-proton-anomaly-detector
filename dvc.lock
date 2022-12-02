@@ -4,77 +4,77 @@ stages:
     cmd: python src/process.py
     deps:
     - path: config/main.yaml
-      md5: 3e2ea25128beddbe1bb0adaa7d8b5ab1
-      size: 579
+      md5: b961383160bc1f6da9e59c2f160a1ff0
+      size: 1314
     - path: config/process
-      md5: df97c8e2e624cc5a37f170af7c162dc9.dir
-      size: 71
+      md5: f91dbebb2a6b714be687535f3f72cf16.dir
+      size: 843
       nfiles: 2
     - path: data/raw
-      md5: 6ffbaaad7b4ac6e1afabed19a80b2560.dir
-      size: 0
-      nfiles: 1
+      md5: 9b1605c160641a34f6115bced37be1d0.dir
+      size: 7683410295
+      nfiles: 2
     - path: src/process
-      md5: 6ffbaaad7b4ac6e1afabed19a80b2560.dir
-      size: 0
-      nfiles: 1
+      md5: 6f501029ea4a1886acb392753b357cf1.dir
+      size: 28626
+      nfiles: 5
     - path: src/process.py
-      md5: c62061bf646fa00b3fafb62095c7d03b
-      size: 422
+      md5: 0572eb342605254c895548aaa8c531c3
+      size: 883
     outs:
     - path: data/processed
-      md5: 6ffbaaad7b4ac6e1afabed19a80b2560.dir
-      size: 0
-      nfiles: 1
+      md5: c447782aec5c6de2bc4903d7b2837731.dir
+      size: 579624129
+      nfiles: 93
   visualize:
     cmd: python src/visualize.py
     deps:
     - path: config/main.yaml
-      md5: 3e2ea25128beddbe1bb0adaa7d8b5ab1
-      size: 579
+      md5: b961383160bc1f6da9e59c2f160a1ff0
+      size: 1314
     - path: config/model
-      md5: 2b8a65a0449618b79724d144c45809bc.dir
-      size: 24
+      md5: 4809761e3618fd23f0910f3e64b3c2d4.dir
+      size: 500
       nfiles: 2
     - path: data/processed
-      md5: 6ffbaaad7b4ac6e1afabed19a80b2560.dir
-      size: 0
-      nfiles: 1
+      md5: c447782aec5c6de2bc4903d7b2837731.dir
+      size: 579624129
+      nfiles: 93
     - path: src/visualize
-      md5: 6ffbaaad7b4ac6e1afabed19a80b2560.dir
-      size: 0
-      nfiles: 1
-    - path: src/visualize.py
-      md5: 357bbcb7d5916a81c4ae742537ad9cea
-      size: 547
-    outs:
-    - path: reports
-      md5: 406ce63d8f7db4ee78058d1b102cca6b.dir
+      md5: 859facca2297b30b2de2282a62826908.dir
       size: 0
       nfiles: 2
+    - path: src/visualize.py
+      md5: 9edaa9dacde779570fb562e7aed4f4cf
+      size: 6613
+    outs:
+    - path: reports
+      md5: a10f20b3a8a6833ba9213550986fbcc9.dir
+      size: 1342780947
+      nfiles: 33
   train_model:
     cmd: python src/train_model.py
     deps:
     - path: config/main.yaml
-      md5: 3e2ea25128beddbe1bb0adaa7d8b5ab1
-      size: 579
+      md5: b961383160bc1f6da9e59c2f160a1ff0
+      size: 1314
     - path: config/model
-      md5: 2b8a65a0449618b79724d144c45809bc.dir
-      size: 24
+      md5: 0d5a3990d70da2799e9a3a8b7bd750fd.dir
+      size: 842
       nfiles: 2
     - path: data/processed
-      md5: 6ffbaaad7b4ac6e1afabed19a80b2560.dir
-      size: 0
-      nfiles: 1
+      md5: c447782aec5c6de2bc4903d7b2837731.dir
+      size: 579624129
+      nfiles: 93
     - path: src/model
-      md5: 6ffbaaad7b4ac6e1afabed19a80b2560.dir
+      md5: 859facca2297b30b2de2282a62826908.dir
       size: 0
-      nfiles: 1
+      nfiles: 2
     - path: src/train_model.py
-      md5: bf26202037fa4548d54c8b1628fdb4d5
-      size: 533
+      md5: 2e960204c7bb27550b5451b48b0e7930
+      size: 5023
     outs:
     - path: models
-      md5: 6ffbaaad7b4ac6e1afabed19a80b2560.dir
-      size: 0
-      nfiles: 1
+      md5: 19f33d241cddbaa7d499f254bd1500d8.dir
+      size: 7603911482
+      nfiles: 17
