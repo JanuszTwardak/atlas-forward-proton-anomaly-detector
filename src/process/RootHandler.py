@@ -26,14 +26,14 @@ class RootHandler:
         min_hits_no: int,
         max_hits_no: int,
         events_limit_no: Union[int, None],
-        interim_dir: str,
+        output_dir: str,
     ) -> None:
         """extract_root Method that extracts root to DataFrame format, applies all functions that
         convert multi-column, fixed data representation into modern DataFrame style.
         Calculates standard deviation of hits' coordinates (spread), merges both station sides
         data, merges hits coming from 4 planes from single detector into average one (weighted
         average by charge).
-        Extracted and processed data will be saved in '{interim_dir}/extracted_root.parquet' file.
+        Extracted and processed data will be saved in '{output_dir}/extracted_root.parquet' file.
 
         Args:
             root_paths (List[str]): List containing paths to root files that will be extracted.
@@ -46,11 +46,11 @@ class RootHandler:
             number of hits will be removed.
             events_limit_no (Union[int, None]): Limit number of events that will be extracted.
             If None, all events in file will be taken.
-            interim_dir (str): Path to interim directory, where new folder "extracted_root"
+            output_dir (str): Path to save directory where new folder "extracted_root"
             with function output will be created.
         """
 
-        output_dir = Path(interim_dir) / "extracted_root"
+        output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # uproot hasn't been updated for some time and because of that it uses deprecated
@@ -82,6 +82,9 @@ class RootHandler:
 
                     chunk["run_id"] = str(Path(root_path).stem)
                     chunk["run_id"] = chunk["run_id"].astype("category")
+                    for col in chunk.columns:
+                        if col not in []:
+                            chunk[col] = chunk[col].astype("category")
 
                     output_path = (
                         output_dir
@@ -94,6 +97,14 @@ class RootHandler:
                         f"- preprocessing: {Path(root_path).stem} | progress: {size_done:.2f}/{total_size:.2f} GB"
                     )
                     log.debug(chunk.info(), chunk.memory_usage(deep=True))
+                    for col in [
+                        "hits_row_1",
+                        "hits_row_2",
+                        "hits_col_1",
+                        "hits_col_2",
+                        "hits_n",
+                    ]:
+                        print(f"--> {col}\n", str(chunk[col].describe()))
 
                     chunk_iter += 1
 
@@ -139,73 +150,61 @@ class RootHandler:
             from one side, not order of station placement.
         """
 
-        weights_a_1 = df.filter(regex="^hits_q\\[1", axis=1).where(
-            df.filter(regex="^hits_q\[", axis=1) != -1000001.0, 0
-        )
-        weights_c_1 = df.filter(regex="^hits_q\\[2", axis=1).where(
-            df.filter(regex="^hits_q\[", axis=1) != -1000001.0, 0
-        )
-        rows_a = df.filter(regex="^hits_row\\[1", axis=1)
-        rows_c = df.filter(regex="^hits_row\\[2", axis=1)
-        df["a_hit_row_1"] = (rows_a * weights_a_1.values).sum(
-            axis=1
-        ) / weights_a_1.sum(axis=1)
-        df["c_hit_row_1"] = (rows_c * weights_c_1.values).sum(
-            axis=1
-        ) / weights_c_1.sum(axis=1)
+        df = df.replace(-1, np.nan)
 
-        # second detector (in hit order)
-        weights_a_2 = df.filter(regex="^hits_q\\[0", axis=1).where(
-            df.filter(regex="^hits_q\[", axis=1) != -1000001.0, 0
-        )
-        weights_c_2 = df.filter(regex="^hits_q\\[3", axis=1).where(
-            df.filter(regex="^hits_q\[", axis=1) != -1000001.0, 0
-        )
-        df.drop(df.filter(regex="^hits_q", axis=1), axis=1, inplace=True)
-        rows_a = df.filter(regex="^hits_row\\[0", axis=1)
-        rows_c = df.filter(regex="^hits_row\\[3", axis=1)
+        # Might look tricky, but very easy to understand. We have few different features named
+        # "tracks_{A}", where A is element from suffixes and that is the first loop.
+        suffixes = ("row", "col")
 
-        df["a_hit_row_2"] = (rows_a * weights_a_2.values).sum(
-            axis=1
-        ) / weights_a_2.sum(axis=1)
+        # Inside loop iterates through four detectors, where first two belong to "a" side and
+        # latter two to "c" side. The only tricky part is that we want to take order in which
+        # particle has gone through detectors, which is 1->0 for a side and 2->3 for c side:
+        # <----- [0] <----- [1] <-----(HIT)-----> [2] -----> [3] ----->
+        num_to_side = OrderedDict([(1, "a"), (0, "a"), (2, "c"), (3, "c")])
 
-        df["c_hit_row_2"] = (rows_c * weights_c_2.values).sum(
-            axis=1
-        ) / weights_c_2.sum(axis=1)
+        # at the end of new column name we add "_1" or "_2" to represent order in which
+        # track was registered
+        side_num_corr = {1: 1, 0: 2, 2: 1, 3: 2}
 
-        del [rows_a, rows_c]
+        for suff in suffixes:
+            for num, side in num_to_side.items():
 
-        df[["a_hit_row_2", "c_hit_row_2"]] = df[
-            ["a_hit_row_2", "c_hit_row_2"]
-        ].apply(pd.to_numeric, downcast="unsigned")
+                col_name = f"{side}_hits_{suff}_{side_num_corr[num]}"
 
-        gc.collect()
+                df[col_name] = (
+                    df.filter(regex=f"^hits_{suff}\\[{num}", axis=1)
+                ).mean(axis=1)
 
-        columns_a = df.filter(regex="^hits_col\\[1", axis=1)
-        columns_c = df.filter(regex="^hits_col\\[2", axis=1)
-        df["a_hit_column_1"] = (columns_a * weights_a_1.values).sum(
-            axis=1
-        ) / weights_a_1.sum(axis=1)
-        df["c_hit_column_1"] = (columns_c * weights_c_1.values).sum(
-            axis=1
-        ) / weights_c_1.sum(axis=1)
-        columns_a = df.filter(regex="^hits_col\\[0", axis=1)
-        columns_c = df.filter(regex="^hits_col\\[3", axis=1)
-        df["a_hit_column_2"] = (columns_a * weights_a_2.values).sum(
-            axis=1
-        ) / weights_a_2.sum(axis=1)
-        df["c_hit_column_2"] = (columns_c * weights_c_2.values).sum(
-            axis=1
-        ) / weights_c_2.sum(axis=1)
+                ## TODO REMOVE
 
-        del [columns_a, columns_c]
+                print(
+                    f"@inside>hit_{suff}_[{num}:",
+                    df.filter(regex=f"^hits_{suff}\\[{num}", axis=1).head(),
+                )
+                print(f"@inside>mean: {df[col_name]}")
+                df = df.drop(
+                    df.filter(regex=f"^hits_{suff}\\[{num}", axis=1), axis=1
+                )
 
-        df["a_charge_1"] = weights_a_1.sum(axis=1)
-        df["a_charge_2"] = weights_a_2.sum(axis=1)
-        df["c_charge_1"] = weights_c_1.sum(axis=1)
-        df["c_charge_2"] = weights_c_2.sum(axis=1)
+        # gc.collect()
 
-        del [weights_a_1, weights_c_1, weights_a_2, weights_c_2]
+        # columns_a = df.filter(regex="^hits_col\\[1", axis=1)
+        # columns_c = df.filter(regex="^hits_col\\[2", axis=1)
+        # df["a_hit_column_1"] = (columns_a).sum(axis=1)
+        # df["c_hit_column_1"] = (columns_c).sum(axis=1)
+
+        # columns_a = df.filter(regex="^hits_col\\[0", axis=1)
+        # columns_c = df.filter(regex="^hits_col\\[3", axis=1)
+        # df["a_hit_column_2"] = (columns_a).sum(axis=1)
+        # df["c_hit_column_2"] = (columns_c).sum(axis=1)
+
+        # del [columns_a, columns_c]
+
+        # df["a_charge_1"] = df.filter(regex="^hits_q\\[1", axis=1).sum(axis=1)
+        # df["a_charge_2"] = df.filter(regex="^hits_q\\[0", axis=1).sum(axis=1)
+        # df["c_charge_1"] = df.filter(regex="^hits_q\\[2", axis=1).sum(axis=1)
+        # df["c_charge_2"] = df.filter(regex="^hits_q\\[3", axis=1).sum(axis=1)
+        df = df.drop(df.filter(regex="^hits_q", axis=1), axis=1)
         gc.collect()
 
         return df
@@ -239,8 +238,8 @@ class RootHandler:
             axis=1
         )
 
-        df.drop(df.filter(regex="^hits_col", axis=1), axis=1, inplace=True)
-        df.drop(df.filter(regex="^hits_row", axis=1), axis=1, inplace=True)
+        df = df.drop(df.filter(regex="^hits_col", axis=1), axis=1)
+        df = df.drop(df.filter(regex="^hits_row", axis=1), axis=1)
 
         return df
 
@@ -310,7 +309,7 @@ class RootHandler:
         )
         df["std_distance"] = df["std_distance"].pow(1 / 2)
 
-        df.drop(df.filter(regex="^_", axis=1), axis=1, inplace=True)
+        df = df.drop(columns=["std_row", "std_col"])
 
         return df
 

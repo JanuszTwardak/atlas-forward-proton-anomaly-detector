@@ -12,7 +12,7 @@ log = logging.getLogger("process")
     config_path="../config",
     config_name="main",
 )
-def process_data(cfg: DictConfig):
+def process_data(cfg: DictConfig) -> None:
     """Function to process the data"""
 
     print(f"Functions used: {cfg.process.use_functions}")
@@ -24,7 +24,7 @@ def process_data(cfg: DictConfig):
         min_hits_no=cfg.process.min_hits_number,
         max_hits_no=cfg.process.max_hits_number,
         events_limit_no=cfg.process.events_limit_no,
-        interim_dir=abspath(cfg.interim.dir),
+        output_dir=abspath(cfg.processed.dir),
     )
 
 

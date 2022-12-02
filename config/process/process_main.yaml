@@ -27,4 +27,4 @@ max_hits_number: 100
 # (str) "{50} MB" on my pc 50 MB of chunk size requires 17GB of RAM
 memory_chunk_size: 50 MB
 #
-events_limit_no: 1000
+events_limit_no: null
