@@ -1,4 +1,4 @@
-# atlas-forward-proton-anomaly-detector
+# Atlas Forward Proton Anomaly Detector
 
 
 ### Preface
