@@ -7,8 +7,8 @@ defaults:
 ###
 #PIPELINE
 to_train: True
-to_merge_scores_and_data: False
-draw_all_plots: False
+to_merge_scores_and_data: True
+draw_all_plots: True
 
 
 ################################ PATHS ################################

@@ -9,6 +9,8 @@ from pathlib2 import Path
 from tqdm import tqdm
 from datetime import datetime
 import logging
+from sklearn.ensemble import IsolationForest
+import numpy as np
 
 log = logging.getLogger("__name__")
 
@@ -27,28 +29,85 @@ def train_model(cfg: DictConfig) -> None:
     # print(f"Train modeling using {input_path}")
     # print(f"Model used: {config.model.name}")
     # print(f"Save the output to {output_path}")
-    if cfg.to_train:
-        _train_or_load(
-            forest_dimensions=cfg.model.forest_dimensions,
-            ntrees=cfg.model.ntrees,
-            input_data_dir=abspath(cfg.processed.dir),
-            model_dir=abspath(cfg.model_dir),
-            use_tracks=cfg.model.use_tracks,
-            max_depth=cfg.model.max_depth,
-            missing_action=cfg.model.missing_action,
-            sample_size=cfg.model.sample_size,
-            prob_pick_pooled_gain=cfg.model.prob_pick_pooled_gain,
-            ntry=cfg.model.ntry,
-            prob_pick_avg_gain=cfg.model.prob_pick_avg_gain,
-            coefs=cfg.model.coefs,
+    # if cfg.to_train:
+    #     _train_or_load(
+    #         forest_dimensions=cfg.model.forest_dimensions,
+    #         ntrees=cfg.model.ntrees,
+    #         input_data_dir=abspath(cfg.processed.dir),
+    #         model_dir=abspath(cfg.model_dir),
+    #         use_tracks=cfg.model.use_tracks,
+    #         max_depth=cfg.model.max_depth,
+    #         missing_action=cfg.model.missing_action,
+    #         sample_size=cfg.model.sample_size,
+    #         prob_pick_pooled_gain=cfg.model.prob_pick_pooled_gain,
+    #         ntry=cfg.model.ntry,
+    #         prob_pick_avg_gain=cfg.model.prob_pick_avg_gain,
+    #         coefs=cfg.model.coefs,
+    #     )
+
+    # _predict_scores(
+    #     model_dir=abspath(cfg.model_dir),
+    #     data_dir=abspath(cfg.processed.dir),
+    #     reports_dir=abspath(cfg.reports_dir),
+    #     use_tracks=cfg.model.use_tracks,
+    # )
+
+    model = IsolationForest(
+        n_estimators=500,
+        max_samples=0.1,
+        max_features=0.2,
+        bootstrap=True,
+        n_jobs=-1,
+        verbose=1,
+        warm_start=True,
+    )
+
+    scores_save_path = Path("reports") / "TRADITIONAL_TEST.csv"
+
+    with open(str(scores_save_path), "w+") as f:
+        pass
+
+    dataset_path_list = [
+        path
+        for path in Path("data/processed").iterdir()
+        if path.suffix == ".parquet"
+    ]
+
+    for chunk_path in tqdm(dataset_path_list):
+        chunk = pd.read_parquet(chunk_path, engine="pyarrow")
+        _pred_chunk = chunk.drop(columns=["evN", "run_id", "std_distance"])
+
+        _pred_chunk = _pred_chunk.drop(
+            _pred_chunk.filter(regex="^tracks_", axis=1), axis=1
+        )
+        _pred_chunk = _pred_chunk.select_dtypes(include=np.number).dropna()
+
+        for col in _pred_chunk.columns:
+            print(
+                f">> {col}",
+                sum(pd.isnull(_pred_chunk[col])),
+                "/",
+                f"{_pred_chunk[col].shape[0]}",
+            )
+
+        model.fit(X=_pred_chunk)
+
+    for chunk_path in tqdm(dataset_path_list):
+        chunk = pd.read_parquet(chunk_path, engine="pyarrow")
+        _pred_chunk = chunk.drop(columns=["evN", "run_id", "std_distance"])
+
+        _pred_chunk = _pred_chunk.drop(
+            _pred_chunk.filter(regex="^tracks_", axis=1), axis=1
+        )
+        _pred_chunk = _pred_chunk.select_dtypes(include=np.number).dropna()
+
+        scores = chunk[["run_id", "evN"]].copy()
+
+        scores["score"] = pd.DataFrame(
+            model.decision_function(_pred_chunk),
         )
 
-    _predict_scores(
-        model_dir=abspath(cfg.model_dir),
-        data_dir=abspath(cfg.processed.dir),
-        reports_dir=abspath(cfg.reports_dir),
-        use_tracks=cfg.model.use_tracks,
-    )
+        scores.to_csv(scores_save_path, mode="a", index=False, header=False)
 
 
 def _train_or_load(

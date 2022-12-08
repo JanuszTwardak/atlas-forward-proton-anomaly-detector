@@ -56,7 +56,8 @@ def visualize(cfg: DictConfig):
         log.info("Done!")
         # data = data.dropna()
         data["score"] = data["score"].astype(float)
-
+        data = data.drop(columns="std_distance")
+        data = data.dropna()
         with open(abspath(cfg.external.path), "wb") as f:
             pickle.dump(data, f)  # TODO: replace .pickle for .parquet
     else:
@@ -66,41 +67,41 @@ def visualize(cfg: DictConfig):
     print(data.info())
     print(data.describe())
 
-    # plt.title(f"Anomaly score boxplot")
-    # plot_name = f"{Path(scores_paths[-1]).stem}_boxplot.png"
-    # save_dir = Path(cfg.figures_dir)
-    # save_path = save_dir / plot_name
-    # plt.savefig(save_path)
-    # logging.info("Model boxplot saved")
-    # plt.clf()
+    plt.title(f"Anomaly score boxplot")
+    plot_name = f"{Path(scores_paths[-1]).stem}_boxplot.png"
+    save_dir = Path(cfg.figures_dir)
+    save_path = save_dir / plot_name
+    plt.savefig(save_path)
+    logging.info("Model boxplot saved")
+    plt.clf()
 
-    # if cfg.visualize.plots.boxplot.to_draw or cfg.draw_all_plots:
-    #     Visualize.draw_score_boxplots(
-    #         data=data,
-    #         flierprops=cfg.visualize.flierprops,
-    #         output_dir=cfg.figures_dir,
-    #     )
+    if cfg.visualize.plots.boxplot.to_draw or cfg.draw_all_plots:
+        Visualize.draw_score_boxplots(
+            data=data,
+            flierprops=cfg.visualize.flierprops,
+            output_dir=cfg.figures_dir,
+        )
 
-    # if cfg.visualize.plots.quartile_boxplot.to_draw or cfg.draw_all_plots:
-    #     Visualize.draw_quartile_boxplots(
-    #         features=data.select_dtypes(include=np.number).columns,
-    #         quart_features=["score"],
-    #         df=data,
-    #         flierprops=cfg.visualize.flierprops,
-    #         output_dir=cfg.figures_dir,
-    #     )
+    if cfg.visualize.plots.quartile_boxplot.to_draw or cfg.draw_all_plots:
+        Visualize.draw_quartile_boxplots(
+            features=data.select_dtypes(include=np.number).columns,
+            quart_features=["score"],
+            df=data,
+            flierprops=cfg.visualize.flierprops,
+            output_dir=cfg.figures_dir,
+        )
 
-    # if cfg.visualize.plots.pairplot.to_draw or cfg.draw_all_plots:
-    #     Visualize.plot_pairplot(
-    #         data=data,
-    #         output_dir=cfg.figures_dir,
-    #         data_frac=cfg.visualize.taken_dataset_frac,
-    #         kind=cfg.visualize.plots.pairplot.kind,
-    #         cmap=cfg.visualize.cmap,
-    #         pthresh=cfg.visualize.plots.pairplot.p_threshold,
-    #         bins=cfg.visualize.plots.pairplot.bins,
-    #         common_norm=cfg.visualize.plots.pairplot.use_common_norm,
-    #     )
+    if cfg.visualize.plots.pairplot.to_draw or cfg.draw_all_plots:
+        Visualize.plot_pairplot(
+            data=data,
+            output_dir=cfg.figures_dir,
+            data_frac=cfg.visualize.taken_dataset_frac,
+            kind=cfg.visualize.plots.pairplot.kind,
+            cmap=cfg.visualize.cmap,
+            pthresh=cfg.visualize.plots.pairplot.p_threshold,
+            bins=cfg.visualize.plots.pairplot.bins,
+            common_norm=cfg.visualize.plots.pairplot.use_common_norm,
+        )
 
 
 class Visualize:
