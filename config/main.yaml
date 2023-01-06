@@ -6,7 +6,7 @@ defaults:
 
 ###
 #PIPELINE
-to_train: True
+to_train: False
 to_merge_scores_and_data: False
 draw_all_plots: False
 
@@ -44,12 +44,12 @@ model_dir: models
 # well as all plots
 reports:
   dir: reports
-  figures_dir: reports/figures
+  figures_dir: ${reports.dir}/figures
 
 
 
-reports_dir: reports
-figures_dir: reports/figures
+# reports_dir: reports
+# figures_dir: reports/figures
 
 ######################################################################
 

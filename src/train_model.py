@@ -18,17 +18,11 @@ log = logging.getLogger("__name__")
     config_path="../config",
     config_name="main",
 )
-def train_model(cfg: DictConfig) -> None:
+def train_load_predict(cfg: DictConfig) -> None:
     """Function to train the model on all data from processed dir. It should have .parquet format."""
 
-    # input_path = abspath(config.processed.path)
-    # output_path = abspath(config.final.path)
-
-    # print(f"Train modeling using {input_path}")
-    # print(f"Model used: {config.model.name}")
-    # print(f"Save the output to {output_path}")
     if cfg.to_train:
-        _train_or_load(
+        _train(
             forest_dimensions=cfg.model.forest_dimensions,
             ntrees=cfg.model.ntrees,
             input_data_dir=abspath(cfg.processed.dir),
@@ -51,7 +45,7 @@ def train_model(cfg: DictConfig) -> None:
     )
 
 
-def _train_or_load(
+def _train(
     forest_dimensions: int,
     ntrees: int,
     input_data_dir: str,
@@ -60,17 +54,26 @@ def _train_or_load(
     sample_size: int,
     max_depth: int,
     missing_action: str,
-    prob_pick_pooled_gain: float,
-    ntry: int,
-    prob_pick_avg_gain: float,
-    coefs: str,
 ) -> None:
+    """_train Method responsible for creating model and performing training.
+
+    Args:
+        forest_dimensions (int): Number of dimensions of the forest.
+        ntrees (int): Number of trees in the forest
+        input_data_dir (str): Directory to processed data.
+        model_dir (str): Directory where model will be saved.
+        use_tracks (bool): If model should use tracks for learning
+        sample_size (int): Size of single sample used for training tree
+        max_depth (int): Maximum depth of single tree.
+        missing_action (str): Action to be taken if NaN is encountered.
+    """
 
     model = IsolationForest(
         sample_size=sample_size,
         ndim=forest_dimensions,
         ntrees=ntrees,
         missing_action=missing_action,
+        max_depth=max_depth,
     )
 
     dataset_path_list = [
@@ -88,6 +91,7 @@ def _train_or_load(
                 _learning_chunk.filter(regex="^tracks_", axis=1), axis=1
             )
         model = model.partial_fit(_learning_chunk)
+        log.info(_learning_chunk.head())
 
     model_save_path = Path(abspath(model_dir)) / f"{timestamp}.pickle"
 
@@ -133,6 +137,7 @@ def _predict_scores(
     ]
 
     log.info(f"Predicting scores using model {Path(model_paths[-1]).stem}...")
+
     for chunk_path in tqdm(dataset_path_list):
         chunk = pd.read_parquet(chunk_path, engine="pyarrow")
         _pred_chunk = chunk.drop(columns=["evN", "run_id"])
@@ -140,8 +145,9 @@ def _predict_scores(
             _pred_chunk = _pred_chunk.drop(
                 _pred_chunk.filter(regex="^tracks_", axis=1), axis=1
             )
+            _pred_chunk = _pred_chunk.dropna()
+        log.info(_pred_chunk)
         scores = chunk[["run_id", "evN"]].copy()
-
         scores["score"] = pd.DataFrame(
             model.predict(_pred_chunk),
         )
@@ -150,4 +156,4 @@ def _predict_scores(
 
 
 if __name__ == "__main__":
-    train_model()
+    train_load_predict()

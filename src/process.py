@@ -13,16 +13,18 @@ log = logging.getLogger("process")
     config_name="main",
 )
 def process_data(cfg: DictConfig) -> None:
-    """Function to process the data"""
+    """process_data Function to run all preprocessing functions with options specified in config.
 
-    print(f"Functions used: {cfg.process.use_functions}")
+    Args:
+        cfg (DictConfig): Config file.
+    """
 
     RootHandler.extract_root(
         root_paths=[abspath(path) for path in cfg.raw.paths],
         branches_to_extract=cfg.process.branches_to_extract,
         chunk_size=cfg.process.memory_chunk_size,
-        min_hits_no=cfg.process.min_hits_number,
-        max_hits_no=cfg.process.max_hits_number,
+        hits_n_limits=tuple(cfg.process.hits_n_limits),
+        hits_tracks_limits=tuple(cfg.process.hits_tracks_limits),
         events_limit_no=cfg.process.events_limit_no,
         output_dir=abspath(cfg.processed.dir),
     )

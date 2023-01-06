@@ -1,6 +1,8 @@
+import itertools
 import time
-from typing import List, Optional
+from typing import Dict, List, Optional, Union
 import hydra
+import matplotlib
 import numpy as np
 from omegaconf import DictConfig
 from hydra.utils import to_absolute_path as abspath
@@ -12,6 +14,8 @@ import logging
 from matplotlib import pyplot as plt
 import pickle
 
+# from visualize.DistributionPlots import DistributionPlots
+
 log = logging.getLogger("visualize")
 
 
@@ -21,7 +25,12 @@ log = logging.getLogger("visualize")
     config_name="main",
 )
 def visualize(cfg: DictConfig):
-    """Function to train the model"""
+    """visualize Function to combine predicted scores with the rest of extracted data
+    and to run all visualization plots.
+
+    Args:
+        cfg (DictConfig): config file.
+    """
 
     scores_paths = sorted(
         [
@@ -42,20 +51,15 @@ def visualize(cfg: DictConfig):
         data = pd.concat(
             map(pd.read_parquet, data_chunks_path_list), ignore_index=True
         )
-        log.info("Done!")
-        log.info(f"Using {Path(scores_paths[-1]).stem}")
-        log.info("Loading scores...")
         scores = pd.read_csv(
             scores_paths[-1], names=["run_id", "evN", "score"]
         )
-        log.info("Done!")
         scores["evN"] = scores["evN"].astype(str)
         data["evN"] = data["evN"].astype(str)
+        data["score"] = data["score"].astype(float)
         log.info("Merging data with scores...")
         data = data.merge(right=scores, on="evN")
-        log.info("Done!")
-        # data = data.dropna()
-        data["score"] = data["score"].astype(float)
+        data = data.dropna()
 
         with open(abspath(cfg.external.path), "wb") as f:
             pickle.dump(data, f)  # TODO: replace .pickle for .parquet
@@ -63,47 +67,46 @@ def visualize(cfg: DictConfig):
         with open(abspath(cfg.external.path), "rb") as f:
             data = pickle.load(f)
 
-    print(data.info())
-    print(data.describe())
+    if cfg.visualize.plots.boxplot.to_draw or cfg.draw_all_plots:
 
-    # plt.title(f"Anomaly score boxplot")
-    # plot_name = f"{Path(scores_paths[-1]).stem}_boxplot.png"
-    # save_dir = Path(cfg.figures_dir)
-    # save_path = save_dir / plot_name
-    # plt.savefig(save_path)
-    # logging.info("Model boxplot saved")
-    # plt.clf()
+        Visualize.draw_score_violinplot(
+            data=data,
+            flierprops=cfg.visualize.flierprops,
+            output_dir=cfg.reports.figures_dir,
+        )
 
-    # if cfg.visualize.plots.boxplot.to_draw or cfg.draw_all_plots:
-    #     Visualize.draw_score_boxplots(
-    #         data=data,
-    #         flierprops=cfg.visualize.flierprops,
-    #         output_dir=cfg.figures_dir,
-    #     )
+    if cfg.visualize.plots.grouped_violinplots.to_draw or cfg.draw_all_plots:
 
-    # if cfg.visualize.plots.quartile_boxplot.to_draw or cfg.draw_all_plots:
-    #     Visualize.draw_quartile_boxplots(
-    #         features=data.select_dtypes(include=np.number).columns,
-    #         quart_features=["score"],
-    #         df=data,
-    #         flierprops=cfg.visualize.flierprops,
-    #         output_dir=cfg.figures_dir,
-    #     )
+        Visualize.draw_grouped_violinplots(
+            features=data.select_dtypes(include=np.number).columns,
+            quart_features=["score"],
+            df=data,
+            flierprops=cfg.visualize.flierprops,
+            output_dir=cfg.reports.figures_dir,
+            axis_limits=cfg.visualize.plots.grouped_violinplots.axis_limits,
+            range_limits=None,
+        )
 
-    # if cfg.visualize.plots.pairplot.to_draw or cfg.draw_all_plots:
-    #     Visualize.plot_pairplot(
-    #         data=data,
-    #         output_dir=cfg.figures_dir,
-    #         data_frac=cfg.visualize.taken_dataset_frac,
-    #         kind=cfg.visualize.plots.pairplot.kind,
-    #         cmap=cfg.visualize.cmap,
-    #         pthresh=cfg.visualize.plots.pairplot.p_threshold,
-    #         bins=cfg.visualize.plots.pairplot.bins,
-    #         common_norm=cfg.visualize.plots.pairplot.use_common_norm,
-    #     )
+    if cfg.visualize.plots.pairplot.to_draw or cfg.draw_all_plots:
+        Visualize.plot_pairplot(
+            data=data,
+            output_dir=cfg.reports.figures_dir,
+            data_frac=cfg.visualize.taken_dataset_frac,
+            kind=cfg.visualize.plots.pairplot.kind,
+            cmap=cfg.visualize.cmap,
+            pthresh=cfg.visualize.plots.pairplot.p_threshold,
+            bins=cfg.visualize.plots.pairplot.bins,
+            common_norm=cfg.visualize.plots.pairplot.use_common_norm,
+            groups_limits=cfg.visualize.plots.pairplot.groups_limits,
+            stat=cfg.visualize.plots.pairplot.stat,
+        )
 
 
 class Visualize:
+    """
+    Class containing all methods responsible for visualization.
+    """
+
     @staticmethod
     def plot_pairplot(
         data: pd.DataFrame,
@@ -114,6 +117,8 @@ class Visualize:
         pthresh: Optional[float] = None,
         bins: Optional[int] = 2000,
         common_norm: Optional[bool] = False,
+        stat: Optional[str] = "count",
+        groups_limits: Optional[List[float]] = None,
     ) -> None:
 
         if data_frac < 1.0:
@@ -121,36 +126,114 @@ class Visualize:
 
         sns.set_theme(style="dark")
 
-        p_grid = sns.PairGrid(data, height=2.5)
-        time_start = time.time()
-        log.info(f"Started pairplot plotting!")
-        if kind == "histplot":
-            logging.info(f"Plotting histplot on lower diagonal...")
+        full_data = Visualize.get_grouped(data, groups_limits)
 
-            p_grid.map_lower(
-                sns.histplot,
-                bins=bins,
-                pthresh=pthresh,
-                # cmap=cmap,
-                cbar=False,
+        for group in full_data["score_quart"].unique():
+
+            data = full_data[full_data["score_quart"] == group]
+
+            # Visualize.draw_slopes(data, output_dir, group)
+
+            p_grid = sns.PairGrid(data, height=2.5)
+            time_start = time.time()
+            log.info(f"Started pairplot plotting!")
+            if kind == "histplot":
+                logging.info(f"Plotting histplot on lower diagonal...")
+
+                p_grid.map_lower(
+                    sns.histplot,
+                    bins=20,
+                    pthresh=None,
+                    hue=data["side"],
+                    # cmap=cmap,
+                    cbar=False,
+                    stat=stat,
+                )
+
+                # loc = matplotlib.ticker.MultipleLocator(0.5)
+                lims = [
+                    (20, 80),
+                    (3.5, 4.5),
+                    (-15, -5),
+                    (-15, -5),
+                    (-20, 20),
+                    (-20, 20),
+                    (-0.002, 0.005),
+                    (-0.02, 0.005),
+                    (-0.01, 0.01),
+                    (-0.02, 0.01),
+                    (0, 300),
+                    (0, 300),
+                    (0, 75),  # hits_col_1
+                    (0, 75),
+                    (10000, 25000),
+                    (0, 75),
+                    (8.5, 9.5),
+                    (0.3, 0.7),
+                ]
+
+                for ax, (ylims, xlims) in zip(
+                    p_grid.axes.flat,
+                    itertools.product(lims, lims),
+                    # itertools.product(tick_inc, tick_inc)
+                ):
+                    ax.set_xlim(xlims)
+                    ax.set_ylim(ylims)
+
+                p_grid.map_upper(
+                    sns.kdeplot,
+                    fill=True,
+                )
+
+                logging.info(f"Histplot on lower diagonal done!")
+
+            p_grid.map_diag(plt.hist, bins=10)
+            plt.legend(f"pairplot with score group in ({group})")
+            Path(output_dir).mkdir(parents=True, exist_ok=True)
+            plot_name = f"run3_pair_{kind}_{int(data_frac*100)}_{data_frac}_{group}.png"
+            save_path = Path(output_dir) / plot_name
+            plt.savefig(save_path)
+            plt.clf()
+            time_stop = time.time()
+            log.info(
+                f"Pairplot finished! Total time: {int((time_stop - time_start)/60)} minutes"
             )
 
-            logging.info(f"Histplot on lower diagonal done!")
+    @staticmethod
+    def draw_slopes(data: pd.DataFrame, output_dir: str, group_str: str):
 
-        # p_grid.map_diag(plt.hist, bins=20, color="orange")
-
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
-        plot_name = f"run3_pair_{kind}_{int(data_frac*100)}_{data_frac}.png"
-        save_path = Path(output_dir) / plot_name
-        plt.savefig(save_path)
+        tracks_sx = {
+            "tracks_sx_1": "tracks_sy_1",
+            "tracks_sx_2": "tracks_sy_2",
+        }
+        plt.figure(figsize=(40, 20))
         plt.clf()
-        time_stop = time.time()
-        log.info(
-            f"Pairplot finished! Total time: {int((time_stop - time_start)/60)} minutes"
-        )
+        plt.title(f"score in ({group_str})")
+        i = 1
+        for letter in ["a", "c"]:
+            for tr in tracks_sx.items():
+                plt.subplot(1, 4, i)
+
+                plt.xlim((-0.025, 0.025))
+                plt.ylim((-0.025, 0.025))
+                dist = "NEAR" if tr[0][-1] == "1" else "FAR"
+                plt.title(f"{letter.upper()} {dist} score=({group_str})")
+
+                plt.ylabel("slope y")
+                plt.xlabel("slope x")
+                x = data[data["side"] == letter][tr[0]]
+                y = data[data["side"] == letter][tr[1]]
+
+                sns.kdeplot(data=data, x=x, y=y, fill=True, cmap="flare")
+                i += 1
+
+        plot_name = f"run3_slopes_grouped_{group_str}.png"
+        save_path = Path(output_dir) / plot_name
+        plt.savefig(str(save_path))
+        plt.clf()
 
     @staticmethod
-    def draw_score_boxplots(
+    def draw_score_violinplot(
         data: pd.DataFrame,
         flierprops: dict,
         output_dir: str,
@@ -159,70 +242,137 @@ class Visualize:
         logging.info("Creating boxplot...")
 
         for version in [None, "side"]:
-            sns.boxplot(
+            sns.violinplot(
                 x="score",
                 y=version,
                 data=data,
-                flierprops=flierprops,
             )
 
-            plt.title("Scores boxplot for all events")
+            plt.title("Violinplot for all events")
 
             # quantiles = np.quantilfe(
             #     data["scores"], np.array([0.00, 0.25, 0.50, 0.75, 1.00])
             # )
 
             logging.info("Saving plot...")
-            plot_name = f"run3_score_boxplot_all_{version}.png"
+            plot_name = f"run3_score_violinplot_all_{version}.png"
             save_path = Path(output_dir) / plot_name
             plt.savefig(str(save_path))
             logging.info("Plot saved")
             plt.clf()
 
     @staticmethod
-    def draw_quartile_boxplots(
+    def get_grouped(
+        df: pd.DataFrame,
+        range_limits: Optional[Union[List[float], bool]] = None,
+    ):
+        grouping_feature = "score"
+
+        if range_limits is None:
+            range_limits = [0.0, 0.25, 0.5, 0.75, 1.0]
+            range_name = "quartile"
+            in_plot_title = "quartile"
+            labels = ["1st", "2nd", "3rd", "4th"]
+        else:
+            range_name = ""
+            for limit in range_limits:
+                range_name += str(limit) + "_"
+            range_name = range_name.replace(".", ",")
+            labels = []
+            for index, limit in enumerate(range_limits[:-1]):
+                labels.append(f"{limit*100}%-{range_limits[index+1]*100}%")
+
+        # df = df.sort_values(by=quart_feature)
+        ranges = df[grouping_feature].quantile(range_limits).to_numpy()
+
+        log.debug(ranges)
+        df[f"{grouping_feature}_quart"] = pd.cut(
+            df[grouping_feature],
+            bins=ranges,
+            labels=labels,
+        )
+
+        return df
+
+    @staticmethod
+    def draw_grouped_violinplots(
         features: List[str],
         quart_features: List[str],
         df: pd.DataFrame,
         flierprops: dict,
         output_dir: str,
+        axis_limits: Dict[str, List[float]],
+        range_limits: Optional[List[float]] = None,
     ) -> None:
 
+        if range_limits is None:
+            range_limits = [0.0, 0.25, 0.5, 0.75, 1.0]
+            range_name = "quartile"
+            in_plot_title = "quartile"
+            labels = ["1st", "2nd", "3rd", "4th"]
+        else:
+            range_name = ""
+            for limit in range_limits:
+                range_name += str(limit) + "_"
+            range_name = range_name.replace(".", ",")
+            labels = []
+            for index, limit in enumerate(range_limits[:-1]):
+                labels.append(f"{limit*100}%-{range_limits[index+1]*100}%")
+
         for quart_feature in quart_features:
-            df = df.sort_values(by=quart_feature)
-            quartile_ranges = (
-                df[quart_feature]
-                .quantile([0.0, 0.25, 0.5, 0.75, 1.0])
-                .to_numpy()
-            )
+            # df = df.sort_values(by=quart_feature)
+            ranges = df[quart_feature].quantile(range_limits).to_numpy()
 
-            log.debug(quartile_ranges)
-
+            log.debug(ranges)
             df[f"{quart_feature}_quart"] = pd.cut(
                 df[quart_feature],
-                bins=quartile_ranges,
-                labels=["1st", "2nd", "3rd", "4th"],
+                bins=ranges,
+                labels=labels,
             )
 
             for feature in features:
-                plot = sns.boxplot(
+                plot = sns.violinplot(
                     data=df,
                     x=feature,
                     y=f"{quart_feature}_quart",
-                    flierprops=flierprops,
+                    hue="side",
+                    split=True,
                 )
                 plt.title(
-                    f"{feature} boxplots grouped by {quart_feature} quartile "
+                    f"{feature} violinplot grouped by {quart_feature} groups"
                 )
-                plt.ylabel(f"{quart_feature} quartile")
+                plt.ylabel(f"{quart_feature} group")
                 plt.xlabel(f"{feature}")
-                plot_name = f"{feature}_groupedby_{quart_feature}_quartiles_boxplot.png"
-                save_dir = Path(output_dir) / "quartile_boxplots"
+                plot_name = f"{feature}_groupedby_{quart_feature}_groups_violinplot.png"
+                save_dir = Path(output_dir) / f"violinplots_{range_name}"
                 save_dir.mkdir(parents=True, exist_ok=True)
                 save_path = save_dir / plot_name
                 plt.savefig(save_path)
                 logging.info("Plot saved")
                 plt.clf()
+
+                if feature in axis_limits:
+
+                    plot = sns.violinplot(
+                        data=df,
+                        x=feature,
+                        y=f"{quart_feature}_quart",
+                        hue="side",
+                        split=True,
+                    )
+                    plt.title(
+                        f"{feature} violinplot grouped by {quart_feature} groups"
+                    )
+                    plt.ylabel(f"{quart_feature} group")
+                    plt.xlabel(f"{feature}")
+                    plot.set(xlim=(tuple(axis_limits[feature])))
+                    plot_name = f"{feature}_groupedby_{quart_feature}_quartiles_violinplot_limited.png"
+                    save_dir = Path(output_dir) / f"violinplots_{range_name}"
+                    save_dir.mkdir(parents=True, exist_ok=True)
+                    save_path = save_dir / plot_name
+                    plt.savefig(save_path)
+                    logging.info("Plot saved")
+                    plt.clf()
 
 
 if __name__ == "__main__":

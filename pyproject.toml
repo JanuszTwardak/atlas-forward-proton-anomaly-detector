@@ -28,6 +28,7 @@ pyarrow = "^10.0.0"
 p5py = "^1.0.0"
 pep517 = "^0.13.0"
 tqdm = "^4.64.1"
+isotree = "^0.5.17"
 
 
 [tool.poetry.dev-dependencies]

@@ -1,7 +1,7 @@
 from collections import OrderedDict
 import numpy as np
 import uproot
-from typing import List, Optional, Union
+from typing import List , Tuple, Union
 import pandas as pd
 import gc
 import os
@@ -23,9 +23,9 @@ class RootHandler:
         root_paths: List[str],
         branches_to_extract: List[str],
         chunk_size: str,
-        min_hits_no: int,
-        max_hits_no: int,
-        events_limit_no: Union[int, None],
+        hits_n_limits: Tuple[int, int],
+        hits_tracks_limits: Tuple[int, int],
+        events_limit_no: Union[Union[int, int], None],
         output_dir: str,
     ) -> None:
         """extract_root Method that extracts root to DataFrame format, applies all functions that
@@ -44,7 +44,7 @@ class RootHandler:
             number of hits will be removed.
             max_hits_no (int): Maximum number of hits in single event. Any events with higher
             number of hits will be removed.
-            events_limit_no (Union[int, None]): Limit number of events that will be extracted.
+            events_limit_no (Union[int, int]): Limit number of events that will be extracted.
             If None, all events in file will be taken.
             output_dir (str): Path to save directory where new folder "extracted_root"
             with function output will be created.
@@ -54,7 +54,8 @@ class RootHandler:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         # uproot hasn't been updated for some time and because of that it uses deprecated
-        # function from Pandas to merge DataFrames, which creates hundreds of
+        # function from Pandas to merge DataFrames, which creates hundreds of performance
+        # warnings in logs, so this filter ignores them
         simplefilter(action="ignore", category=pd.errors.PerformanceWarning)
         sys.path.append(".")
 
@@ -71,13 +72,15 @@ class RootHandler:
                     step_size=chunk_size,
                     entry_stop=events_limit_no,
                 ):
-                    chunk = RootHandler._extract_hits_number(chunk)
-                    chunk = RootHandler._extract_avg_coords_and_charge(chunk)
-                    chunk = RootHandler._extract_hit_std_deviation(chunk)
-                    chunk = RootHandler._extract_tracks(chunk)
-                    chunk = RootHandler._merge_sides(
-                        chunk, min_hits_no, max_hits_no
+                    chunk = RootHandler._extract_hits_number(
+                        chunk, hits_n_limits
                     )
+                    chunk = RootHandler._extract_tracks(
+                        chunk, hits_tracks_limits
+                    )
+                    chunk = RootHandler._extract_hit_std_deviation(chunk)
+                    chunk = RootHandler._extract_avg_coords_and_charge(chunk)
+                    chunk = RootHandler._merge_sides(chunk)
                     chunk = RootHandler._merge_hit_std_deviations(chunk)
 
                     chunk["run_id"] = str(Path(root_path).stem)
@@ -90,6 +93,28 @@ class RootHandler:
                         output_dir
                         / f"{Path(root_path).stem}_{chunk_iter}.parquet"
                     )
+
+                    chunk = chunk.dropna(
+                        subset=[
+                            "evN",
+                            "hits_row_1",
+                            "hits_row_2",
+                            "hits_col_1",
+                            "hits_col_2",
+                            "std_distance",
+                            "hits_q",
+                        ]
+                    )
+
+                    cols = [
+                        i
+                        for i in chunk.columns
+                        if i not in ["evN", "side", "run_id"]
+                    ]
+
+                    for col in cols:
+                        chunk[col] = pd.to_numeric(chunk[col])
+
                     chunk.to_parquet(output_path, engine="pyarrow")
 
                     size_done = int(chunk_size[:-3]) * chunk_iter * 1e-3
@@ -97,21 +122,15 @@ class RootHandler:
                         f"- preprocessing: {Path(root_path).stem} | progress: {size_done:.2f}/{total_size:.2f} GB"
                     )
                     log.debug(chunk.info(), chunk.memory_usage(deep=True))
-                    for col in [
-                        "hits_row_1",
-                        "hits_row_2",
-                        "hits_col_1",
-                        "hits_col_2",
-                        "hits_n",
-                    ]:
-                        print(f"--> {col}\n", str(chunk[col].describe()))
 
                     chunk_iter += 1
 
         log.info("Preprocess finished!")
 
     @staticmethod
-    def _extract_hits_number(df: pd.DataFrame) -> pd.DataFrame:
+    def _extract_hits_number(
+        df: pd.DataFrame, hits_n_ranges: Tuple[int, int]
+    ) -> pd.DataFrame:
         """extract_hits_number Reduces redundant, multiple columns containing information about
         hit numbers into two single columns, each for stations side.
 
@@ -128,6 +147,14 @@ class RootHandler:
         df["a_hits_n"] = df.filter(regex="^hits\\[[01]", axis=1).sum(axis=1)
         df["c_hits_n"] = df.filter(regex="^hits\\[[23]", axis=1).sum(axis=1)
         df.drop(df.filter(regex="^hits\\[", axis=1), axis=1, inplace=True)
+
+        min_hits, max_hits = hits_n_ranges
+
+        df = df[df["a_hits_n"] >= min_hits]
+        df = df[df["a_hits_n"] <= max_hits]
+        df = df[df["c_hits_n"] >= min_hits]
+        df = df[df["c_hits_n"] <= max_hits]
+
         return df
 
     @staticmethod
@@ -154,7 +181,7 @@ class RootHandler:
 
         # Might look tricky, but very easy to understand. We have few different features named
         # "tracks_{A}", where A is element from suffixes and that is the first loop.
-        suffixes = ("row", "col")
+        suffixes = ("row", "col", "q")
 
         # Inside loop iterates through four detectors, where first two belong to "a" side and
         # latter two to "c" side. The only tricky part is that we want to take order in which
@@ -175,36 +202,24 @@ class RootHandler:
                     df.filter(regex=f"^hits_{suff}\\[{num}", axis=1)
                 ).mean(axis=1)
 
-                ## TODO REMOVE
-
-                print(
-                    f"@inside>hit_{suff}_[{num}:",
-                    df.filter(regex=f"^hits_{suff}\\[{num}", axis=1).head(),
-                )
-                print(f"@inside>mean: {df[col_name]}")
                 df = df.drop(
                     df.filter(regex=f"^hits_{suff}\\[{num}", axis=1), axis=1
                 )
 
-        # gc.collect()
+        df["a_hits_q"] = df["a_hits_q_1"] + df["a_hits_q_2"]
+        df["c_hits_q"] = df["c_hits_q_1"] + df["c_hits_q_2"]
+        df = df.drop(
+            columns=[
+                "a_hits_q_1",
+                "a_hits_q_2",
+                "c_hits_q_1",
+                "c_hits_q_2",
+            ]
+        )
 
-        # columns_a = df.filter(regex="^hits_col\\[1", axis=1)
-        # columns_c = df.filter(regex="^hits_col\\[2", axis=1)
-        # df["a_hit_column_1"] = (columns_a).sum(axis=1)
-        # df["c_hit_column_1"] = (columns_c).sum(axis=1)
-
-        # columns_a = df.filter(regex="^hits_col\\[0", axis=1)
-        # columns_c = df.filter(regex="^hits_col\\[3", axis=1)
-        # df["a_hit_column_2"] = (columns_a).sum(axis=1)
-        # df["c_hit_column_2"] = (columns_c).sum(axis=1)
-
-        # del [columns_a, columns_c]
-
-        # df["a_charge_1"] = df.filter(regex="^hits_q\\[1", axis=1).sum(axis=1)
-        # df["a_charge_2"] = df.filter(regex="^hits_q\\[0", axis=1).sum(axis=1)
-        # df["c_charge_1"] = df.filter(regex="^hits_q\\[2", axis=1).sum(axis=1)
-        # df["c_charge_2"] = df.filter(regex="^hits_q\\[3", axis=1).sum(axis=1)
         df = df.drop(df.filter(regex="^hits_q", axis=1), axis=1)
+        df = df.drop(df.filter(regex="^hits_col", axis=1), axis=1)
+        df = df.drop(df.filter(regex="^hits_row", axis=1), axis=1)
         gc.collect()
 
         return df
@@ -224,9 +239,11 @@ class RootHandler:
             {X} = a and {X} = c (anticlockwise and clockwise station sides) that contains
             respective standard deviation value of given variable.
         """
+
         df["a_std_col"] = df.filter(regex="^hits_col\\[[01]", axis=1).std(
             axis=1
         )
+
         df["a_std_row"] = df.filter(regex="^hits_row\\[[01]", axis=1).std(
             axis=1
         )
@@ -238,16 +255,11 @@ class RootHandler:
             axis=1
         )
 
-        df = df.drop(df.filter(regex="^hits_col", axis=1), axis=1)
-        df = df.drop(df.filter(regex="^hits_row", axis=1), axis=1)
-
         return df
 
     @staticmethod
     def _merge_sides(
         df: pd.DataFrame,
-        min_hits: Optional[int] = 1,
-        max_hits: Optional[int] = 100,
     ) -> pd.DataFrame:
         """merge_detector_sides Combines columns containing same information about event
         that are separated for each of two station sides. This makes events indistinguishable
@@ -284,10 +296,6 @@ class RootHandler:
         df["side"] = "c"
         df = df.append(buffor)
         df["side"] = df["side"].astype("category")
-
-        df = df[df["hits_n"] >= min_hits]
-        df = df[df["hits_n"] <= max_hits]
-
         return df
 
     @staticmethod
@@ -327,8 +335,10 @@ class RootHandler:
                 log.info(file["TreeHits"].show())
 
     @staticmethod
-    def _extract_tracks(df: pd.DataFrame) -> pd.DataFrame:
-        """extract_hits_number Reduces redundant, multiple columns containing information about
+    def _extract_tracks(
+        df: pd.DataFrame, hits_tracks_limits: Tuple[int, int]
+    ) -> pd.DataFrame:
+        """_extract_tracks Reduces redundant, multiple columns containing information about
         tracks into 18 single columns, each for stations side.
 
         Args:
@@ -378,5 +388,11 @@ class RootHandler:
                 df = df.drop(
                     df.filter(regex=f"^tracks_{suff}\\[{num}", axis=1), axis=1
                 )
+
+        min_tracks, max_tracks = hits_tracks_limits
+        df = df[df["a_tracks"] >= min_tracks]
+        df = df[df["a_tracks"] <= max_tracks]
+        df = df[df["c_tracks"] >= min_tracks]
+        df = df[df["c_tracks"] <= max_tracks]
 
         return df

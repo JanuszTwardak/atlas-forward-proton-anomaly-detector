@@ -1,11 +1,11 @@
 #################### ROOT DATA ####################
-use_functions:
-  - add_hits_number
-  - add_average_coordinates
-  - add_hit_std_deviation
-  - merge_detector_sides
-  - merge_std_deviations
-  - optimize_memory
+# use_functions:
+#   - add_hits_number
+#   - add_average_coordinates
+#   - add_hit_std_deviation
+#   - merge_detector_sides
+#   - merge_std_deviations
+#   - optimize_memory
 
 branches_to_extract:
   - evN # (int) event number, value unique for each run
@@ -13,18 +13,18 @@ branches_to_extract:
   - hits_row  # (int) between [0, 335], coordinate row number
   - hits_col  # (int) between [0, 79], coordinate column number
   - hits_q  # () charge left in single hit
-  - tracks 
-  - tracks_x
-  - tracks_y
-  - tracks_sx
-  - tracks_sy
+  - tracks  # number of tracks (see: AFP tracks extraction algorithm)
+  - tracks_x  # tracks in x axis
+  - tracks_y  # tracks in y axis
+  - tracks_sx # tracks angle in x axis
+  - tracks_sy # tracks angle in y axis
 
-min_hits_number: 1
-max_hits_number: 100
+hits_n_limits: [1, 150] # interval includes extreme values
+hits_tracks_limits: [4, 4] # interval includes extreme values
 
 #################### PERFORMANCE ####################
 
 # (str) "{50} MB" on my pc 50 MB of chunk size requires 17GB of RAM
 memory_chunk_size: 50 MB
-#
+
 events_limit_no: null

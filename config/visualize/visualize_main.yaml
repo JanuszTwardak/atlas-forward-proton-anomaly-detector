@@ -4,15 +4,25 @@ plots:
     kind: "histplot"
     # (float in [0, 1] | None) cells with aggregate counts (statistics) 
     # up to this proportion of the total will be transparent.
-    p_threshold: 0.15
-    bins: 100
+    p_threshold: null
+    bins: "auto"
     use_common_norm: False
+    groups_limits: [0.0, 0.05, 0.1, 0.2, 1.0]
+    stat: count
 
   boxplot:
     to_draw: False
 
-  quartile_boxplot:
+  grouped_violinplots:
     to_draw: False
+    range_limits: [0.0, 0.1, 0.2, 0.3, 1.0]
+    axis_limits:
+      tracks: [0, 5]
+      hits_n: [0, 40]
+      tracks_sx_1: [-0.003, 0.003]
+      tracks_sx_2: [-0.003, 0.003]
+      tracks_sy_1: [-0.008, 0.003]
+      tracks_sy_2: [-0.0105, 0.008]
   
 flierprops: 
   markersize: 1
