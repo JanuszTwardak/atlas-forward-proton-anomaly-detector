@@ -67,32 +67,3 @@ To run the entire pipeline, type:
 ```bash
 dvc repo
 ```
-
-## Version your data
-Read [this article](https://towardsdatascience.com/introduction-to-dvc-data-version-control-tool-for-machine-learning-projects-7cb49c229fe0) on how to use DVC to version your data.
-
-```bash
-dvc remote add -d remote <REMOTE-URL>
-```
-Commit the config file:
-```bash
-git commit .dvc/config -m "Configure remote storage"
-```
-Push the data to remote storage:
-```bash
-dvc push 
-```
-Add and push all changes to Git:
-```bash
-git add .
-git commit -m 'commit-message'
-git push origin <branch>
-```
-
-# Auto-generate API documentation
-
-To auto-generate API document for your project, run:
-
-```bash
-make docs
-```
